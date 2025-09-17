@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Video Chat</title>
+    <title>WebRTC Video Chat with Firebase</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,13 +14,16 @@
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
         <div class="controls">
-            <button id="startButton">Start Call</button>
-            <button id="callButton" disabled>Call</button>
+            <button id="startButton">Start Stream</button>
+            <button id="callButton" disabled>Create Room</button>
             <button id="hangupButton" disabled>Hang Up</button>
+            <div class="room-controls">
+                <input type="text" id="roomId" placeholder="Enter Room ID">
+                <button id="joinButton" disabled>Join Room</button>
+            </div>
         </div>
     </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html> -->
 

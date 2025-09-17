@@ -166,15 +166,36 @@
 // }
 
 
-  const localVideo = document.getElementById('localVideo');
-  const remoteVideo = document.getElementById('remoteVideo');
-  const startButton = document.getElementById('startButton');
-  const callButton = document.getElementById('callButton');
-  const hangupButton = document.getElementById('hangupButton');
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, onValue, remove, get } from 'firebase/database';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import firebaseConfig from '../src/firebaseConfig.js';
 
-  let canvas, ctx, captureStream;
-  let peerConnection;
-  const socket = io(); // connect to signaling server (same origin)
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+// WebRTC Configuration
+const configuration = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ],
+    iceCandidatePoolSize: 10
+};
+
+// DOM elements
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+const startButton = document.getElementById('startButton');
+const callButton = document.getElementById('callButton');
+const hangupButton = document.getElementById('hangupButton');
+
+// Variables
+let canvas, ctx, captureStream;
+let peerConnection;
+const socket = io();
 
   // Signaling
   socket.on('offer', handleOffer);
