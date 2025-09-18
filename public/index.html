@@ -23,30 +23,107 @@
             </div>
         </div>
     </div>
-    <script type="module" src="js/main.js"></script>
+
+    Firebase App (the core Firebase SDK) -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script> -->
+    <!-- Firebase Authentication -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script> -->
+    <!-- Firebase Realtime Database -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script> -->
+    
+    <!-- Your Firebase configuration -->
+    <!-- <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDE8AYlrR28IwDSNKSg2-KUo0ypKazeiNk",
+            authDomain: "dev-project-46310.firebaseapp.com",
+            projectId: "dev-project-46310",
+            storageBucket: "dev-project-46310.firebasestorage.app",
+            messagingSenderId: "880060702120",
+            appId: "1:880060702120:web:93a1142fa3085d3568919d",
+            measurementId: "G-JF87DTKG8J"
+        };
+    </script>
+
+    <script src="js/main.js"></script>
 </body>
 </html> -->
 
 <!-- index.html (minimal) -->
-<!doctype html>
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>RTSP->WebSocket->WebRTC</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Chat</title>
+    <style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        .video-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        video {
+            width: 640px;
+            height: 360px;
+            border: 1px solid #ccc;
+            background: #000;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
 </head>
-
 <body>
-    <video id="localVideo" autoplay playsinline muted style="width:320px;height:180px;border:1px solid #ccc"></video>
-    <video id="remoteVideo" autoplay playsinline style="width:320px;height:180px;border:1px solid #ccc"></video>
-    <div>
-        <button id="startButton">Start</button>
-        <button id="callButton" disabled>Call</button>
-        <button id="hangupButton" disabled>Hangup</button>
+    <div class="container">
+        <h1>IP Camera Stream</h1>
+        <div class="video-container">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+        <div class="controls">
+            <button id="startButton">Start Stream</button>
+            <button id="shareButton" disabled>Share Stream</button>
+            <button id="stopButton" disabled>Stop Stream</button>
+        </div>
+        <div id="roomIdDisplay" style="margin-top: 10px; display: none;">
+            Room ID: <span id="roomId"></span>
+        </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <!-- Firebase Config -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDE8AYlrR28IwDSNKSg2-KUo0ypKazeiNk",
+            authDomain: "dev-project-46310.firebaseapp.com",
+            projectId: "dev-project-46310",
+            storageBucket: "dev-project-46310.firebasestorage.app",
+            messagingSenderId: "880060702120",
+            appId: "1:880060702120:web:93a1142fa3085d3568919d",
+            measurementId: "G-JF87DTKG8J"
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+
     <script src="js/main.js"></script>
 </body>
-
 </html>

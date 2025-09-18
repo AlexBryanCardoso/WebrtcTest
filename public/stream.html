@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Camera Stream Test</title>
+    <style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        video {
+            width: 640px;
+            height: 360px;
+            border: 1px solid #ccc;
+            margin: 10px;
+            background: #000;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <button id="startButton">Start Stream</button>
+    </div>
+    <script src="js/stream.js"></script>
+</body>
+</html>

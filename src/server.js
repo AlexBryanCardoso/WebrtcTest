@@ -150,7 +150,7 @@ function startFFmpeg() {
 
   ffmpeg.stderr.on('data', (d) => {
     // Uncomment if you want ffmpeg logs:
-    // console.error('ffmpeg stderr:', d.toString());
+    console.error('ffmpeg stderr:', d.toString());
   });
 
   ffmpeg.on('exit', (code, sig) => {
