@@ -123,6 +123,11 @@ wss.on('connection', (ws) => {
 // Launch ffmpeg and broadcast JPEG frames
 function startFFmpeg() {
   const rtspUrl = process.env.CAMERA_URL || config.camera.url;
+  if (!rtspUrl) {
+    console.error('No camera URL provided. Please set CAMERA_URL environment variable or update config.json');
+    return;
+  }
+  
   const width = config.stream.width || 1280;
   const height = config.stream.height || 720;
   const fps = config.stream.fps || 15;
@@ -147,6 +152,7 @@ function startFFmpeg() {
 
   const ffmpegArgs = [
     '-rtsp_transport', 'tcp',
+    '-stimeout', '5000000',  // 5 second timeout
     '-i', rtspUrl,
     '-an',
     '-vf', `scale=${width}:${height}`,
