@@ -86,13 +86,17 @@ io.on('connection', (socket) => {
 });
 
 // Start HTTP + Socket.IO server
-httpServer.listen(config.server.port || 3000, () => {
-  console.log(`Signaling server listening on http://localhost:${config.server.port || 3000}`);
+const PORT = process.env.PORT || config.server.port || 3000;
+httpServer.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
 
 // MJPEG WebSocket server
-const wss = new WebSocket.Server({ port: 9999 });
-console.log('MJPEG WebSocket server listening on ws://localhost:9999');
+const wss = new WebSocket.Server({ 
+    server: httpServer,
+    path: '/stream'
+});
+console.log('MJPEG WebSocket server attached to HTTP server');
 
 wss.on('connection', (ws) => {
   console.log('MJPEG client connected. Total clients:', wss.clients.size);

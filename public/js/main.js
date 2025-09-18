@@ -242,7 +242,12 @@ async function startStream() {
     localVideo.srcObject = captureStream;
 
     // Connect to MJPEG WebSocket
-    ws = new WebSocket('ws://'+location.hostname+':9999');
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsPort = window.location.hostname === 'localhost' ? ':9999' : '';
+    const wsUrl = `${protocol}//${window.location.hostname}${wsPort}/stream`;
+    console.log('Connecting to WebSocket:', wsUrl);
+    
+    ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {
