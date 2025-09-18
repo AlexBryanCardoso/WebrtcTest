@@ -122,18 +122,28 @@ wss.on('connection', (ws) => {
 
 // Launch ffmpeg and broadcast JPEG frames
 function startFFmpeg() {
-  const rtspUrl = config.camera.url;
+  const rtspUrl = process.env.CAMERA_URL || config.camera.url;
   const width = config.stream.width || 1280;
   const height = config.stream.height || 720;
   const fps = config.stream.fps || 15;
 
+  // Check if the URL is a local network address
+  const isLocalUrl = /^rtsp:\/\/[^@]+@(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|localhost|127\.0\.0\.1)/.test(rtspUrl);
+  
   console.log('FFmpeg configuration:', {
-    rtspUrl,
+    rtspUrl: rtspUrl.replace(/(rtsp:\/\/)([^@]+@)/, '$1****@'), // Hide credentials in logs
+    isLocalUrl,
     width,
     height,
     fps,
     env: process.env.NODE_ENV
   });
+
+  if (process.env.NODE_ENV === 'production' && isLocalUrl) {
+    console.error('ERROR: Attempting to access local network camera from production environment.');
+    console.error('Please use a public IP/domain or set up proper network access.');
+    return;
+  }
 
   const ffmpegArgs = [
     '-rtsp_transport', 'tcp',
@@ -149,8 +159,12 @@ function startFFmpeg() {
 
   console.log('Starting ffmpeg with args:', ffmpegArgs.join(' '));
   const ffmpeg = spawn('ffmpeg', ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
-
+  
+  console.log('FFmpeg process started with PID:', ffmpeg.pid);
+  
   let frameBuffer = Buffer.alloc(0);
+  let frameCount = 0;
+  const startTime = Date.now();
 
   ffmpeg.stdout.on('data', (chunk) => {
     frameBuffer = Buffer.concat([frameBuffer, chunk]);
@@ -163,9 +177,19 @@ function startFFmpeg() {
       if (eoi === -1) break;
 
       const jpg = frameBuffer.slice(soi, eoi + 2);
+      frameCount++;
+      if (frameCount % 30 === 0) { // Log every 30 frames
+        const elapsed = (Date.now() - startTime) / 1000;
+        console.log(`Streaming stats: ${frameCount} frames in ${elapsed.toFixed(1)}s (${(frameCount/elapsed).toFixed(1)} fps)`);
+      }
+
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(jpg);
+          try {
+            client.send(jpg);
+          } catch (err) {
+            console.error('Error sending frame to client:', err.message);
+          }
         }
       });
 
