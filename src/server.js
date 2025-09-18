@@ -152,7 +152,7 @@ function startFFmpeg() {
 
   const ffmpegArgs = [
     '-rtsp_transport', 'tcp',
-    '-stimeout', '5000000',  // 5 second timeout
+    '-timeout', '5000000',  // 5 second timeout
     '-i', rtspUrl,
     '-an',
     '-vf', `scale=${width}:${height}`,
@@ -173,6 +173,7 @@ function startFFmpeg() {
   const startTime = Date.now();
 
   ffmpeg.stdout.on('data', (chunk) => {
+    hasReceivedData = true; // Mark that we've received data
     frameBuffer = Buffer.concat([frameBuffer, chunk]);
 
     let start = 0;
@@ -205,23 +206,49 @@ function startFFmpeg() {
     frameBuffer = frameBuffer.slice(start);
   });
 
+  // Track if we've received any data
+  let hasReceivedData = false;
+  let connectionTimeout;
+
+  // Set a timeout to restart FFmpeg if we don't receive any data
+  connectionTimeout = setTimeout(() => {
+    if (!hasReceivedData) {
+      console.error('No data received from camera within timeout period. Restarting FFmpeg...');
+      ffmpeg.kill();
+    }
+  }, 10000); // 10 second timeout
+
   ffmpeg.stderr.on('data', (d) => {
+    const output = d.toString();
     // Always log FFmpeg output in production
     if (process.env.NODE_ENV === 'production' || process.env.DEBUG) {
-      console.error('FFmpeg stderr:', d.toString());
+      console.error('FFmpeg stderr:', output);
+    }
+    
+    // Check for common RTSP errors
+    if (output.includes('Connection refused') || 
+        output.includes('Connection timed out') ||
+        output.includes('Error opening input')) {
+      console.error('RTSP Connection Error:', output);
+      ffmpeg.kill();
     }
   });
 
   ffmpeg.on('exit', (code, sig) => {
+    clearTimeout(connectionTimeout);
     console.error('FFmpeg process exited with code:', code, 'signal:', sig);
     if (process.env.NODE_ENV === 'production') {
       console.error('FFmpeg process exit details:', {
         code,
         signal: sig,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        hasReceivedData
       });
     }
-    setTimeout(startFFmpeg, 2000);
+    // Increase retry delay if we haven't received any data
+    const retryDelay = hasReceivedData ? 2000 : 5000;
+    console.log(`Retrying in ${retryDelay/1000} seconds...`);
+    setTimeout(startFFmpeg, retryDelay);
   });
 
   ffmpeg.on('error', (err) => {
