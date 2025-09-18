@@ -127,6 +127,14 @@ function startFFmpeg() {
   const height = config.stream.height || 720;
   const fps = config.stream.fps || 15;
 
+  console.log('FFmpeg configuration:', {
+    rtspUrl,
+    width,
+    height,
+    fps,
+    env: process.env.NODE_ENV
+  });
+
   const ffmpegArgs = [
     '-rtsp_transport', 'tcp',
     '-i', rtspUrl,
@@ -168,17 +176,32 @@ function startFFmpeg() {
   });
 
   ffmpeg.stderr.on('data', (d) => {
-    // Uncomment if you want ffmpeg logs:
-    console.error('ffmpeg stderr:', d.toString());
+    // Always log FFmpeg output in production
+    if (process.env.NODE_ENV === 'production' || process.env.DEBUG) {
+      console.error('FFmpeg stderr:', d.toString());
+    }
   });
 
   ffmpeg.on('exit', (code, sig) => {
-    console.error('ffmpeg exited', code, sig);
+    console.error('FFmpeg process exited with code:', code, 'signal:', sig);
+    if (process.env.NODE_ENV === 'production') {
+      console.error('FFmpeg process exit details:', {
+        code,
+        signal: sig,
+        timestamp: new Date().toISOString()
+      });
+    }
     setTimeout(startFFmpeg, 2000);
   });
 
   ffmpeg.on('error', (err) => {
-    console.error('ffmpeg spawn error', err);
+    console.error('FFmpeg spawn error:', {
+      error: err.message,
+      code: err.code,
+      path: err.path,
+      spawnargs: err.spawnargs,
+      timestamp: new Date().toISOString()
+    });
     setTimeout(startFFmpeg, 2000);
   });
 }
