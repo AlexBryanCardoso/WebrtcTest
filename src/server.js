@@ -92,11 +92,19 @@ httpServer.listen(PORT, () => {
 });
 
 // MJPEG WebSocket server
-const wss = new WebSocket.Server({ 
-    server: httpServer,
-    path: '/stream'
-});
-console.log('MJPEG WebSocket server attached to HTTP server');
+let wss;
+if (process.env.NODE_ENV === 'production') {
+    // Production: Attach to HTTP server
+    wss = new WebSocket.Server({ 
+        server: httpServer,
+        path: '/stream'
+    });
+    console.log('MJPEG WebSocket server attached to HTTP server');
+} else {
+    // Development: Standalone WebSocket server
+    wss = new WebSocket.Server({ port: 9999 });
+    console.log('MJPEG WebSocket server listening on ws://localhost:9999');
+}
 
 wss.on('connection', (ws) => {
   console.log('MJPEG client connected. Total clients:', wss.clients.size);

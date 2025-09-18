@@ -242,9 +242,15 @@ async function startStream() {
     localVideo.srcObject = captureStream;
 
     // Connect to MJPEG WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsPort = window.location.hostname === 'localhost' ? ':9999' : '';
-    const wsUrl = `${protocol}//${window.location.hostname}${wsPort}/stream`;
+    let wsUrl;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Local development
+        wsUrl = `ws://${window.location.hostname}:9999`;
+    } else {
+        // Production
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.hostname}/stream`;
+    }
     console.log('Connecting to WebSocket:', wsUrl);
     
     ws = new WebSocket(wsUrl);
