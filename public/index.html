@@ -101,29 +101,36 @@
 
         async function startStream() {
             try {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const host = window.location.hostname === 'localhost' ? 'localhost:8889' : window.location.host;
-                
                 const response = await fetch('/stream');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
-                const webrtcUrl = await response.text();
+                // Get the redirect URL from the response
+                const redirectUrl = response.headers.get('location');
+                if (!redirectUrl) {
+                    throw new Error('No redirect URL provided by server');
+                }
+                console.log('WebRTC URL:', redirectUrl);
                 
-                // Create WebRTC connection
+                // Create WebRTC connection with STUN servers
                 const pc = new RTCPeerConnection({
-                    iceServers: [{
-                        urls: ['stun:stun.l.google.com:19302']
-                    }]
+                    iceServers: [
+                        { urls: ['stun:stun.l.google.com:19302'] },
+                        { urls: ['stun:stun1.l.google.com:19302'] }
+                    ]
                 });
 
+                // Log ICE candidates for debugging
                 pc.onicecandidate = e => {
-                    if (!e.candidate) return;
-                    console.log('Got candidate:', e.candidate);
+                    if (e.candidate) {
+                        console.log('Got ICE candidate:', e.candidate.candidate);
+                    }
                 };
 
+                // Handle incoming video stream
                 pc.ontrack = e => {
+                    console.log('Received track:', e.track.kind);
                     if (e.track.kind === 'video') {
                         video.srcObject = e.streams[0];
                         status.textContent = 'Stream connected';
@@ -131,9 +138,10 @@
                     }
                 };
 
+                // Handle connection state changes
                 pc.oniceconnectionstatechange = () => {
                     console.log('ICE Connection State:', pc.iceConnectionState);
-                    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                    if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) {
                         status.textContent = 'Connection lost, retrying...';
                         status.className = 'error';
                         pc.close();
@@ -141,35 +149,40 @@
                     }
                 };
 
-                try {
-                    const mediaStream = await navigator.mediaStream.getUserMedia({ video: true });
-                    mediaStream.getTracks().forEach(track => pc.addTrack(track, mediaStream));
-                } catch (err) {
-                    console.log('No camera available, continuing with receive-only');
-                }
-
+                // Create a receive-only offer
                 const offer = await pc.createOffer({
                     offerToReceiveVideo: true,
                     offerToReceiveAudio: true
                 });
                 
                 await pc.setLocalDescription(offer);
+                console.log('Created offer:', offer.sdp);
                 
-                const response2 = await fetch(webrtcUrl, {
+                // Send offer to MediaMTX server
+                const response2 = await fetch(redirectUrl, {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({
                         type: 'offer',
-                        sdp: pc.localDescription.sdp
+                        sdp: offer.sdp
                     })
                 });
 
+                if (!response2.ok) {
+                    throw new Error(`MediaMTX server error: ${response2.status}`);
+                }
+
                 const answer = await response2.json();
-                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log('Received answer:', answer);
                 
-                status.textContent = 'Connecting...';
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                status.textContent = 'Connecting to stream...';
+                
             } catch (error) {
-                console.error('Error:', error);
-                status.textContent = 'Connection error, retrying...';
+                console.error('Connection error:', error);
+                status.textContent = `Connection error: ${error.message}`;
                 status.className = 'error';
                 setTimeout(startStream, 5000);
             }
