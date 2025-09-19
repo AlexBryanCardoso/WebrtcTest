@@ -10,13 +10,11 @@ api: yes
 apiPort: 9997
 metrics: no
 
-# RTMP settings
-rtmp:
+# WebRTC settings
+webrtc:
   enabled: yes
-
-# HLS settings
-hlsAlwaysRemux: yes
-hlsVariant: lowLatency
+  enableTCP: yes
+  allowOrigin: "*"
 
 # Path settings
 paths:
@@ -24,3 +22,7 @@ paths:
     source: rtsp://admin:Admin@123@192.168.1.2:554/1/1?transmode=unicast&profile=vam
     runOnInit: yes
     runOnInitRestart: yes
+    publishUser: admin
+    publishPass: Admin@123
+    readUser: admin
+    readPass: Admin@123

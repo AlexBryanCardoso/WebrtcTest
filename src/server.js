@@ -54,11 +54,9 @@
 
 const express = require('express');
 const http = require('http');
-const { Server: IOServer } = require('socket.io'); // ✅ Added
-const WebSocket = require('ws');
+const { Server: IOServer } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 
 // Load config.json
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json')));
@@ -69,6 +67,33 @@ const httpServer = http.createServer(app);
 
 // Serve static files (public/index.html)
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Proxy WebRTC requests to MediaMTX
+app.all('/stream/*', async (req, res) => {
+    const mediamtxHost = process.env.NODE_ENV === 'production'
+        ? process.env.MEDIAMTX_HOST
+        : 'localhost:8889';
+    
+    const targetUrl = `http://${mediamtxHost}${req.url}`;
+    
+    try {
+        const response = await fetch(targetUrl, {
+            method: req.method,
+            headers: req.headers,
+            body: req.method !== 'GET' ? req.body : undefined
+        });
+        
+        res.status(response.status);
+        response.headers.forEach((value, name) => {
+            res.setHeader(name, value);
+        });
+        
+        response.body.pipe(res);
+    } catch (error) {
+        console.error('Proxy error:', error);
+        res.status(502).send('Proxy error');
+    }
+});
 
 // Socket.IO signaling server
 const io = new IOServer(httpServer, { cors: { origin: '*' } });
