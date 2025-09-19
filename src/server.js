@@ -120,12 +120,22 @@ wss.on('connection', (ws) => {
   );
 });
 
+let retryCount = 0;
+const MAX_RETRIES = 10;
+const INITIAL_RETRY_DELAY = 2000;
+
 // Launch ffmpeg and broadcast JPEG frames
 function startFFmpeg() {
   const rtspUrl = process.env.CAMERA_URL || config.camera.url;
   if (!rtspUrl) {
     console.error('No camera URL provided. Please set CAMERA_URL environment variable or update config.json');
     return;
+  }
+  
+  // Reset retry count if we've been running successfully
+  if (retryCount > 0 && Date.now() - lastSuccessTime > 30000) {
+    console.log('Stream was stable for 30 seconds, resetting retry count');
+    retryCount = 0;
   }
   
   const width = config.stream.width || 1280;
@@ -150,16 +160,22 @@ function startFFmpeg() {
     return;
   }
 
+  // Use MediaMTX URL instead of direct RTSP
+  const mediamtxUrl = process.env.NODE_ENV === 'production' 
+    ? `rtsp://${process.env.MEDIAMTX_HOST}/camera`  // Production MediaMTX URL
+    : 'rtsp://localhost:8554/camera';  // Local MediaMTX URL
+
   const ffmpegArgs = [
     '-rtsp_transport', 'tcp',
-    '-timeout', '5000000',  // 5 second timeout
-    '-i', rtspUrl,
+    '-i', mediamtxUrl,
+    '-nostdin',
+    '-loglevel', 'warning',
     '-an',
+    '-f', 'mjpeg',
     '-vf', `scale=${width}:${height}`,
+    '-qscale:v', '2',
     '-r', String(fps),
-    '-f', 'image2pipe',
-    '-q:v', '5',
-    '-vcodec', 'mjpeg',
+    '-threads', '1',
     'pipe:1'
   ];
 
@@ -209,6 +225,7 @@ function startFFmpeg() {
   // Track if we've received any data
   let hasReceivedData = false;
   let connectionTimeout;
+  let lastSuccessTime = Date.now();
 
   // Set a timeout to restart FFmpeg if we don't receive any data
   connectionTimeout = setTimeout(() => {
@@ -216,7 +233,7 @@ function startFFmpeg() {
       console.error('No data received from camera within timeout period. Restarting FFmpeg...');
       ffmpeg.kill();
     }
-  }, 10000); // 10 second timeout
+  }, 15000); // 15 second timeout for initial connection
 
   ffmpeg.stderr.on('data', (d) => {
     const output = d.toString();
@@ -237,17 +254,28 @@ function startFFmpeg() {
   ffmpeg.on('exit', (code, sig) => {
     clearTimeout(connectionTimeout);
     console.error('FFmpeg process exited with code:', code, 'signal:', sig);
+    
     if (process.env.NODE_ENV === 'production') {
       console.error('FFmpeg process exit details:', {
         code,
         signal: sig,
         timestamp: new Date().toISOString(),
-        hasReceivedData
+        hasReceivedData,
+        retryCount
       });
     }
-    // Increase retry delay if we haven't received any data
-    const retryDelay = hasReceivedData ? 2000 : 5000;
-    console.log(`Retrying in ${retryDelay/1000} seconds...`);
+
+    // Implement exponential backoff
+    retryCount++;
+    if (retryCount > MAX_RETRIES) {
+      console.error('Max retries reached. Waiting for 1 minute before trying again...');
+      retryCount = 0;
+      setTimeout(startFFmpeg, 60000);
+      return;
+    }
+
+    const retryDelay = Math.min(INITIAL_RETRY_DELAY * Math.pow(2, retryCount - 1), 30000);
+    console.log(`Retry ${retryCount}/${MAX_RETRIES} in ${retryDelay/1000} seconds...`);
     setTimeout(startFFmpeg, retryDelay);
   });
 

@@ -1,0 +1,26 @@
+# Log level
+logLevel: info
+
+# RTSP settings
+rtsp:
+  protocols: [tcp, udp]
+
+# HTTP settings
+api: yes
+apiPort: 9997
+metrics: no
+
+# RTMP settings
+rtmp:
+  enabled: yes
+
+# HLS settings
+hlsAlwaysRemux: yes
+hlsVariant: lowLatency
+
+# Path settings
+paths:
+  camera:
+    source: rtsp://admin:Admin@123@192.168.1.2:554/1/1?transmode=unicast&profile=vam
+    runOnInit: yes
+    runOnInitRestart: yes
