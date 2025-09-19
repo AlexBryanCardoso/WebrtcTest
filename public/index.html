@@ -54,7 +54,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Video Chat</title>
+    <title>IP Camera Stream</title>
     <style>
         .container {
             display: flex;
@@ -63,8 +63,6 @@
             margin: 20px;
         }
         .video-container {
-            display: flex;
-            gap: 20px;
             margin: 20px 0;
         }
         video {
@@ -73,18 +71,18 @@
             border: 1px solid #ccc;
             background: #000;
         }
-        .controls {
-            display: flex;
-            gap: 10px;
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
         }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
+        .connected {
+            background: #d4edda;
+            color: #155724;
         }
-        button:disabled {
-            cursor: not-allowed;
-            opacity: 0.6;
+        .error {
+            background: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -92,38 +90,95 @@
     <div class="container">
         <h1>IP Camera Stream</h1>
         <div class="video-container">
-            <video id="localVideo" autoplay playsinline muted></video>
-            <video id="remoteVideo" autoplay playsinline></video>
+            <video id="video" autoplay playsinline muted></video>
         </div>
-        <div class="controls">
-            <button id="startButton">Start Stream</button>
-            <button id="shareButton" disabled>Share Stream</button>
-            <button id="stopButton" disabled>Stop Stream</button>
-        </div>
-        <div id="roomIdDisplay" style="margin-top: 10px; display: none;">
-            Room ID: <span id="roomId"></span>
-        </div>
+        <div id="status">Connecting to stream...</div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-
-    <!-- Firebase Config -->
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDE8AYlrR28IwDSNKSg2-KUo0ypKazeiNk",
-            authDomain: "dev-project-46310.firebaseapp.com",
-            projectId: "dev-project-46310",
-            storageBucket: "dev-project-46310.firebasestorage.app",
-            messagingSenderId: "880060702120",
-            appId: "1:880060702120:web:93a1142fa3085d3568919d",
-            measurementId: "G-JF87DTKG8J"
-        };
-        firebase.initializeApp(firebaseConfig);
-    </script>
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
 
-    <script src="js/main.js"></script>
+        async function startStream() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.hostname === 'localhost' ? 'localhost:8889' : window.location.host;
+                
+                const response = await fetch('/stream');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const webrtcUrl = await response.text();
+                
+                // Create WebRTC connection
+                const pc = new RTCPeerConnection({
+                    iceServers: [{
+                        urls: ['stun:stun.l.google.com:19302']
+                    }]
+                });
+
+                pc.onicecandidate = e => {
+                    if (!e.candidate) return;
+                    console.log('Got candidate:', e.candidate);
+                };
+
+                pc.ontrack = e => {
+                    if (e.track.kind === 'video') {
+                        video.srcObject = e.streams[0];
+                        status.textContent = 'Stream connected';
+                        status.className = 'connected';
+                    }
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    console.log('ICE Connection State:', pc.iceConnectionState);
+                    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                        status.textContent = 'Connection lost, retrying...';
+                        status.className = 'error';
+                        pc.close();
+                        setTimeout(startStream, 5000);
+                    }
+                };
+
+                try {
+                    const mediaStream = await navigator.mediaStream.getUserMedia({ video: true });
+                    mediaStream.getTracks().forEach(track => pc.addTrack(track, mediaStream));
+                } catch (err) {
+                    console.log('No camera available, continuing with receive-only');
+                }
+
+                const offer = await pc.createOffer({
+                    offerToReceiveVideo: true,
+                    offerToReceiveAudio: true
+                });
+                
+                await pc.setLocalDescription(offer);
+                
+                const response2 = await fetch(webrtcUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        type: 'offer',
+                        sdp: pc.localDescription.sdp
+                    })
+                });
+
+                const answer = await response2.json();
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                
+                status.textContent = 'Connecting...';
+            } catch (error) {
+                console.error('Error:', error);
+                status.textContent = 'Connection error, retrying...';
+                status.className = 'error';
+                setTimeout(startStream, 5000);
+            }
+        }
+
+        // Start stream when page loads
+        startStream();
+    </script>
+</body>
+</html>
 </body>
 </html>

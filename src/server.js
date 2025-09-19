@@ -54,9 +54,9 @@
 
 const express = require('express');
 const http = require('http');
-const { Server: IOServer } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const fetch = require('node-fetch'); // We'll use this for proxying
 
 // Load config.json
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json')));
@@ -68,75 +68,24 @@ const httpServer = http.createServer(app);
 // Serve static files (public/index.html)
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Proxy WebRTC requests to MediaMTX
-app.all('/stream/*', async (req, res) => {
+// MediaMTX WebRTC proxy endpoints
+app.get('/stream', (req, res) => {
     const mediamtxHost = process.env.NODE_ENV === 'production'
         ? process.env.MEDIAMTX_HOST
         : 'localhost:8889';
-    
-    const targetUrl = `http://${mediamtxHost}${req.url}`;
-    
-    try {
-        const response = await fetch(targetUrl, {
-            method: req.method,
-            headers: req.headers,
-            body: req.method !== 'GET' ? req.body : undefined
-        });
-        
-        res.status(response.status);
-        response.headers.forEach((value, name) => {
-            res.setHeader(name, value);
-        });
-        
-        response.body.pipe(res);
-    } catch (error) {
-        console.error('Proxy error:', error);
-        res.status(502).send('Proxy error');
-    }
+    res.redirect(`http://${mediamtxHost}/stream/camera/webrtc`);
 });
 
-// Socket.IO signaling server
-const io = new IOServer(httpServer, { cors: { origin: '*' } });
-
-io.on('connection', (socket) => {
-  console.log('Signaling client connected:', socket.id);
-
-  socket.on('offer', (offer) => socket.broadcast.emit('offer', offer));
-  socket.on('answer', (answer) => socket.broadcast.emit('answer', answer));
-  socket.on('ice-candidate', (candidate) => socket.broadcast.emit('ice-candidate', candidate));
-
-  socket.on('disconnect', () =>
-    console.log('Signaling client disconnected:', socket.id)
-  );
-});
-
-// Start HTTP + Socket.IO server
+// Start HTTP server
 const PORT = process.env.PORT || config.server.port || 3000;
 httpServer.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+    console.log(`Server listening on port ${PORT}`);
+    console.log('Environment:', process.env.NODE_ENV);
+    const mediamtxHost = process.env.NODE_ENV === 'production'
+        ? process.env.MEDIAMTX_HOST
+        : 'localhost:8889';
+    console.log(`MediaMTX host: ${mediamtxHost}`);
 });
-
-// MJPEG WebSocket server
-let wss;
-const isProduction = process.env.NODE_ENV === 'production';
-console.log('Environment:', process.env.NODE_ENV);
-
-if (isProduction) {
-    // Production: Attach to HTTP server
-    wss = new WebSocket.Server({ 
-        server: httpServer,
-        path: '/stream',
-        perMessageDeflate: false  // Disable compression for better performance
-    });
-    console.log('MJPEG WebSocket server attached to HTTP server at path /stream');
-} else {
-    // Development: Standalone WebSocket server
-    wss = new WebSocket.Server({ 
-        port: 9999,
-        perMessageDeflate: false  // Disable compression for better performance
-    });
-    console.log('MJPEG WebSocket server listening on ws://localhost:9999');
-}
 
 wss.on('connection', (ws) => {
   console.log('MJPEG client connected. Total clients:', wss.clients.size);
