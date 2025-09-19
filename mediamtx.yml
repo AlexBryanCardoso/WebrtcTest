@@ -14,7 +14,7 @@ metrics: no
 webrtc:
   enabled: yes
   enableTCP: yes
-  allowOrigin: "*"
+  allowOrigin: "https://webrtctest-zwd0.onrender.com/"
 
 # Path settings
 paths:
