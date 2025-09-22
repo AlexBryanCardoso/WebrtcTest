@@ -32,7 +32,7 @@ webrtc:
 # Path settings
 paths:
   camera:
-    source: rtsp://admin:Admin%40123@117.222.89.239:554/1/1?transmode=unicast&profile=vam
+    source: rtsp://admin:Admin%40123@117.222.92.180:554/1/1?transmode=unicast&profile=vam
     runOnInit: yes
     runOnInitRestart: yes
     publishUser: admin
