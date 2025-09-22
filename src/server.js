@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const fetch = require('node-fetch');
 
 // Load configuration
 const config = (() => {
@@ -103,10 +104,12 @@ app.get('/stream', async (req, res) => {
 // Start HTTP server with error handling
 const PORT = process.env.PORT || config.server.port || 3000;
 httpServer.listen(PORT, () => {
+    const { host, protocol } = getMediaMTXConfig();
     console.log('=== Server Configuration ===');
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Server port: ${PORT}`);
-    console.log(`MediaMTX host: ${getMediaMTXHost()}`);
+    console.log(`MediaMTX host: ${host}`);
+    console.log(`MediaMTX protocol: ${protocol}`);
     console.log('========================');
 });
 
