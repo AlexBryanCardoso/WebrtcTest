@@ -12,18 +12,21 @@ metrics: no
 http:
   enabled: yes
   port: 8889
-  allowOrigin: "https://webrtctest-zwd0.onrender.com"
+  allowOrigin: "*"
+  encryption: yes
+  serverCert: /path/to/cert.pem    # Update this path
+  serverKey: /path/to/key.pem      # Update this path
 
 # WebRTC settings
 webrtc:
   enabled: yes
   enableTCP: yes
   enableUDP: yes
-  allowOrigin: "https://webrtctest-zwd0.onrender.com"
+  allowOrigin: "*"
   iceServers: [
-    {
-      urls: "stun:stun.l.google.com:19302"
-    }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] }
   ]
 
 # Path settings
