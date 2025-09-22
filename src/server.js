@@ -39,26 +39,58 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
  */
 app.use('/mediamtx', async (req, res) => {
     try {
-        const { host, protocol } = getMediaMTXConfig();
+        const { host } = getMediaMTXConfig();
+        let targetUrl;
 
-        // Build full URL to MediaMTX
-        const targetUrl = `${protocol}://${host}${req.url}`;
-        console.log(`Proxying request to MediaMTX: ${targetUrl}`);
+        // Try HTTPS first
+        try {
+            targetUrl = `https://${host}${req.url}`;
+            console.log(`Trying HTTPS proxy to MediaMTX: ${targetUrl}`);
+            
+            const response = await fetch(targetUrl, {
+                method: req.method,
+                headers: {
+                    ...req.headers,
+                    host: host.split(':')[0],
+                    'user-agent': 'Render-Proxy'
+                },
+                body: req.method !== 'GET' && req.method !== 'HEAD' ? req : undefined,
+                timeout: 5000
+            });
 
-        // Forward the request to MediaMTX
+            // Copy headers and stream response
+            response.headers.forEach((value, key) => res.setHeader(key, value));
+            res.status(response.status);
+            
+            if (response.body) {
+                response.body.pipe(res);
+            } else {
+                res.end();
+            }
+            return;
+        } catch (httpsError) {
+            console.log('HTTPS proxy failed:', httpsError.message);
+        }
+
+        // Fallback to HTTP if HTTPS fails
+        targetUrl = `http://${host}${req.url}`;
+        console.log(`Falling back to HTTP proxy: ${targetUrl}`);
+        
         const response = await fetch(targetUrl, {
             method: req.method,
-            headers: { ...req.headers, host: undefined },
-            body: req.method !== 'GET' && req.method !== 'HEAD' ? req : undefined
+            headers: {
+                ...req.headers,
+                host: host.split(':')[0],
+                'user-agent': 'Render-Proxy'
+            },
+            body: req.method !== 'GET' && req.method !== 'HEAD' ? req : undefined,
+            timeout: 5000
         });
 
-        // Copy headers from MediaMTX response
+        // Copy headers and stream response
         response.headers.forEach((value, key) => res.setHeader(key, value));
-
-        // Send status code
         res.status(response.status);
-
-        // Stream the response back to client
+        
         if (response.body) {
             response.body.pipe(res);
         } else {
@@ -66,7 +98,13 @@ app.use('/mediamtx', async (req, res) => {
         }
     } catch (error) {
         console.error('Proxy error:', error);
-        res.status(502).json({ error: 'MediaMTX server unreachable', details: error.message });
+        const errorMessage = {
+            error: 'MediaMTX server unreachable',
+            details: error.message,
+            help: 'Please ensure MediaMTX server is running and port 8889 is accessible'
+        };
+        console.error(errorMessage);
+        res.status(502).json(errorMessage);
     }
 });
 
@@ -74,29 +112,53 @@ app.use('/mediamtx', async (req, res) => {
 app.get('/stream', async (req, res) => {
     try {
         const { host, protocol } = getMediaMTXConfig();
-        const streamUrl = `${protocol}://${host}/stream/camera/webrtc`;
         
-        // Test if MediaMTX server is accessible
+        // First try with HTTPS
+        let streamUrl = `https://${host}/stream/camera/webrtc`;
+        console.log(`Trying HTTPS connection to MediaMTX: ${streamUrl}`);
+        
         try {
-            const response = await fetch(streamUrl, { method: 'HEAD' });
-            if (!response.ok) {
-                throw new Error(`MediaMTX server returned ${response.status}`);
-            }
-        } catch (error) {
-            console.error('MediaMTX server error:', error);
-            return res.status(502).json({
-                error: 'MediaMTX server is not accessible',
-                details: error.message
+            const response = await fetch(streamUrl, {
+                method: 'HEAD',
+                timeout: 5000 // 5 second timeout
             });
+            if (response.ok) {
+                console.log('HTTPS connection successful');
+                return res.redirect(streamUrl);
+            }
+        } catch (httpsError) {
+            console.log('HTTPS connection failed:', httpsError.message);
         }
 
-        console.log(`Redirecting to MediaMTX stream: ${streamUrl}`);
-        res.redirect(streamUrl);
+        // If HTTPS fails, try HTTP
+        streamUrl = `http://${host}/stream/camera/webrtc`;
+        console.log(`Trying HTTP connection to MediaMTX: ${streamUrl}`);
+        
+        try {
+            const response = await fetch(streamUrl, {
+                method: 'HEAD',
+                timeout: 5000 // 5 second timeout
+            });
+            if (response.ok) {
+                console.log('HTTP connection successful');
+                return res.redirect(streamUrl);
+            } else {
+                throw new Error(`MediaMTX server returned ${response.status}`);
+            }
+        } catch (httpError) {
+            console.error('HTTP connection failed:', httpError.message);
+            
+            // Try the proxy endpoint as a last resort
+            const proxyUrl = `/mediamtx/stream/camera/webrtc`;
+            console.log(`Falling back to proxy endpoint: ${proxyUrl}`);
+            return res.redirect(proxyUrl);
+        }
     } catch (error) {
         console.error('Stream endpoint error:', error);
         res.status(500).json({
-            error: 'Internal server error',
-            details: error.message
+            error: 'Failed to connect to MediaMTX server',
+            details: error.message,
+            help: 'Please check if MediaMTX is running and accessible'
         });
     }
 });
