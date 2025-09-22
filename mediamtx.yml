@@ -9,17 +9,27 @@ rtsp:
 api: yes
 apiPort: 9997
 metrics: no
+http:
+  enabled: yes
+  port: 8889
+  allowOrigin: "https://webrtctest-zwd0.onrender.com"
 
 # WebRTC settings
 webrtc:
   enabled: yes
   enableTCP: yes
-  allowOrigin: "https://webrtctest-zwd0.onrender.com/"
+  enableUDP: yes
+  allowOrigin: "https://webrtctest-zwd0.onrender.com"
+  iceServers: [
+    {
+      urls: "stun:stun.l.google.com:19302"
+    }
+  ]
 
 # Path settings
 paths:
   camera:
-    source: rtsp://admin:Admin@123@192.168.1.2:554/1/1?transmode=unicast&profile=vam
+    source: rtsp://admin:Admin%40123@117.222.89.239:554/1/1?transmode=unicast&profile=vam
     runOnInit: yes
     runOnInitRestart: yes
     publishUser: admin
